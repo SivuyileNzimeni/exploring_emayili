@@ -1,0 +1,71 @@
+---
+title: "Vehicle Reports"
+author: "Sivuyile Nzimeni"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    css: "Custom.css"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      warning = FALSE,
+                      message = FALSE,
+                      include = FALSE)
+Libraries <- as.list(c("tidyverse","janitor","tidymodels","emayili",
+                       "glue","flextable","tidytext","textrecipes",
+                       "extrafont"))
+lapply(Libraries,require,character.only=TRUE)
+rm(Libraries)
+
+Cars <-read_csv(file = here::here("2021_Vehicle_Prices_2021-09-19.csv"))
+
+Clean_Cars <- recipe(price ~.,data = Cars %>% 
+                       select(-year)) %>% 
+  textrecipes::step_clean_names(all_nominal_predictors()) %>% 
+  prep() %>% 
+  bake(new_data=NULL)
+```
+
+
+Good Day, Mr Manager
+
+Please find the `r paste0("Honda")` report for the week ending `r Sys.Date()`. This week there were `r Cars %>% filter(vehicle_manufacturer == "Honda") %>% nrow()` vehicles for sale. Their average price was R `r paste0(round(mean(Cars[Cars$vehicle_manufacturer =="Honda",5][[1]]),2))`. On average, the vehicles have been in use for `r paste0(round(mean(Cars[Cars$vehicle_manufacturer=="Honda",11][[1]]),0))` years.
+Below, please find the results of linear model used to determinants of price for `r paste0("Honda")`.
+
+```{r Data_Preprocessing}
+Clean_Cars <- recipe(price~.,data = Clean_Cars) %>% 
+  step_normalize(all_numeric_predictors()) %>% 
+  step_nzv(all_predictors()) %>% 
+  prep() %>% 
+  bake(new_data=NULL)
+```
+
+```{r Feauture_Creation}
+Clean_Cars$price <- log(Clean_Cars$price)
+
+Clean_Cars <- Clean_Cars %>% 
+  filter(vehicle_manufacturer == "Honda")
+
+Clean_Cars <- recipe(price~.,data = Clean_Cars) %>% 
+  step_clean_levels(all_nominal_predictors()) %>% 
+  step_other(all_nominal_predictors()) %>% 
+  step_dummy(all_nominal_predictors()) %>% 
+  prep() %>% 
+  bake(new_data=NULL)
+```
+
+```{r Variable_Importance,include=TRUE}
+lm(price~.,data=Clean_Cars)|>
+  vip::vip()+
+  labs(title = paste0("Honda", ": Price Determinants"),
+       subtitle = paste0("Variable Importance"),
+       caption = paste0("plot generated on: ",Sys.Date()))+
+  ggthemes::theme_clean()+
+  theme(text = element_text(family = "Arial Narrow"),
+        plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5,face = "italic"),
+        plot.caption = element_text(size = 4))
+```
+
+
